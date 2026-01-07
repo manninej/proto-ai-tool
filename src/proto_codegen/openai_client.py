@@ -31,22 +31,13 @@ class OpenAIClient:
         self.timeout = timeout
         self.ca_bundle = ca_bundle
 
-    def list_models(self) -> list[str]:
+    def list_models(self) -> list[str] | None:
         response = self._request("GET", "/v1/models")
         data = self._parse_json(response, "/v1/models")
         items = data.get("data", [])
         if isinstance(items, list):
             return [item["id"] for item in items if isinstance(item, dict) and "id" in item]
-        models = data.get("models")
-        if isinstance(models, dict):
-            results = []
-            for key, value in models.items():
-                if isinstance(value, dict) and "model_name" in value:
-                    results.append(value["model_name"])
-                else:
-                    results.append(key)
-            return results
-        return []
+        return None
 
     def probe_chat_completion(self, model: str) -> bool:
         payload = {
@@ -61,6 +52,35 @@ class OpenAIClient:
                 return False
             raise
         return response.status_code // 100 == 2
+
+    def chat_completion(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        response = self._request("POST", "/v1/chat/completions", json=payload)
+        data = self._parse_json(response, "/v1/chat/completions")
+        assistant_text = ""
+        choices = data.get("choices")
+        if isinstance(choices, list) and choices:
+            message = choices[0].get("message") if isinstance(choices[0], dict) else None
+            if isinstance(message, dict):
+                content = message.get("content")
+                if isinstance(content, str):
+                    assistant_text = content
+        return {
+            "assistant_text": assistant_text,
+            "model": data.get("model") if isinstance(data.get("model"), str) else model,
+            "data": data,
+        }
 
     def _request(self, method: str, endpoint: str, json: dict[str, Any] | None = None) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"

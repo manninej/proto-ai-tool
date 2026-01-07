@@ -24,15 +24,18 @@ def discover_models(
     if prefer_endpoint != "probe":
         try:
             models = client.list_models()
-            return [
-                ModelResult(
-                    model_id=model_id,
-                    discovery_method="models_endpoint",
-                    status="available",
-                    details="listed",
-                )
-                for model_id in models
-            ]
+            if models is not None:
+                return [
+                    ModelResult(
+                        model_id=model_id,
+                        discovery_method="models_endpoint",
+                        status="available",
+                        details="listed",
+                    )
+                    for model_id in models
+                ]
+            if prefer_endpoint == "models":
+                return []
         except ApiError as exc:
             if prefer_endpoint == "models" or exc.status_code not in {403, 404}:
                 raise

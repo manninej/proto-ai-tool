@@ -34,9 +34,18 @@ class OpenAIClient:
     def list_models(self) -> list[str] | None:
         response = self._request("GET", "/v1/models")
         data = self._parse_json(response, "/v1/models")
-        items = data.get("data", [])
+        items = data.get("data", None)
         if isinstance(items, list):
             return [item["id"] for item in items if isinstance(item, dict) and "id" in item]
+        models = data.get("models")
+        if isinstance(models, dict):
+            results = []
+            for key, value in models.items():
+                if isinstance(value, dict) and "model_name" in value:
+                    results.append(value["model_name"])
+                else:
+                    results.append(key)
+            return results
         return None
 
     def probe_chat_completion(self, model: str) -> bool:

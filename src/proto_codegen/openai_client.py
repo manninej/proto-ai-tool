@@ -25,10 +25,11 @@ class NetworkError(Exception):
 
 
 class OpenAIClient:
-    def __init__(self, base_url: str, api_key: str | None, timeout: int) -> None:
+    def __init__(self, base_url: str, api_key: str | None, timeout: int, ca_bundle: str | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self.ca_bundle = ca_bundle
 
     def list_models(self) -> list[str]:
         response = self._request("GET", "/v1/models")
@@ -59,7 +60,8 @@ class OpenAIClient:
         last_error: Exception | None = None
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                with httpx.Client(timeout=self.timeout) as client:
+                verify = self.ca_bundle if self.ca_bundle else True
+                with httpx.Client(timeout=self.timeout, verify=verify) as client:
                     response = client.request(method, url, headers=headers, json=json)
                 if response.status_code in RETRYABLE_STATUS_CODES and attempt < MAX_RETRIES:
                     self._sleep_backoff(attempt)

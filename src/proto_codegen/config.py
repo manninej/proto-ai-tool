@@ -8,6 +8,7 @@ DEFAULT_BASE_URL = "https://api.openai.com"
 DEFAULT_TIMEOUT = 30
 DEFAULT_CANDIDATES = ["gpt-oss-120b"]
 CANDIDATE_ENV_VAR = "PROTO_CODEGEN_CANDIDATE_MODELS"
+CA_BUNDLE_ENV_VAR = "PROTO_CODEGEN_CA_BUNDLE"
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class Config:
     api_key: str | None
     timeout: int
     candidates: tuple[str, ...]
+    ca_bundle: str | None
 
     @property
     def has_api_key(self) -> bool:
@@ -33,10 +35,12 @@ def load_config(
     api_key: str | None = None,
     timeout: int | None = None,
     candidates: Sequence[str] | None = None,
+    ca_bundle: str | None = None,
 ) -> Config:
     env_base_url = os.getenv("OPENAI_BASE_URL", DEFAULT_BASE_URL)
     env_api_key = os.getenv("OPENAI_API_KEY")
     env_candidates = _split_candidates(os.getenv(CANDIDATE_ENV_VAR))
+    env_ca_bundle = os.getenv(CA_BUNDLE_ENV_VAR)
 
     resolved_candidates: list[str] = []
     resolved_candidates.extend(DEFAULT_CANDIDATES)
@@ -49,6 +53,7 @@ def load_config(
         api_key=api_key or env_api_key,
         timeout=timeout if timeout is not None else DEFAULT_TIMEOUT,
         candidates=tuple(_dedupe_preserve_order(resolved_candidates)),
+        ca_bundle=ca_bundle or env_ca_bundle,
     )
 
 

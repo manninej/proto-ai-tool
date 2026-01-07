@@ -25,13 +25,19 @@ def main() -> None:
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
 @click.option("--timeout", envvar="PROTO_CODEGEN_TIMEOUT", type=int, help="Request timeout in seconds.")
-def version(base_url: str | None, api_key: str | None, timeout: int | None) -> None:
+@click.option(
+    "--ca-bundle",
+    envvar="PROTO_CODEGEN_CA_BUNDLE",
+    help="Path to a PEM-encoded CA bundle for TLS verification.",
+)
+def version(base_url: str | None, api_key: str | None, timeout: int | None, ca_bundle: str | None) -> None:
     """Show package version and resolved configuration."""
-    config = load_config(base_url=base_url, api_key=api_key, timeout=timeout)
+    config = load_config(base_url=base_url, api_key=api_key, timeout=timeout, ca_bundle=ca_bundle)
     panel = Panel(
         f"Version: {__version__}\n"
         f"Base URL: {config.base_url}\n"
-        f"API key present: {'yes' if config.has_api_key else 'no'}",
+        f"API key present: {'yes' if config.has_api_key else 'no'}\n"
+        f"CA bundle: {config.ca_bundle or 'default'}",
         title="proto-codegen",
     )
     console.print(panel)
@@ -41,6 +47,11 @@ def version(base_url: str | None, api_key: str | None, timeout: int | None) -> N
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
 @click.option("--timeout", envvar="PROTO_CODEGEN_TIMEOUT", type=int, help="Request timeout in seconds.")
+@click.option(
+    "--ca-bundle",
+    envvar="PROTO_CODEGEN_CA_BUNDLE",
+    help="Path to a PEM-encoded CA bundle for TLS verification.",
+)
 @click.option(
     "--prefer-endpoint",
     type=click.Choice(["models", "probe", "auto"], case_sensitive=False),
@@ -53,13 +64,20 @@ def models(
     base_url: str | None,
     api_key: str | None,
     timeout: int | None,
+    ca_bundle: str | None,
     prefer_endpoint: str,
     candidate: Iterable[str],
     as_json: bool,
 ) -> None:
     """Discover available models."""
-    config = load_config(base_url=base_url, api_key=api_key, timeout=timeout, candidates=tuple(candidate))
-    client = OpenAIClient(config.base_url, config.api_key, config.timeout)
+    config = load_config(
+        base_url=base_url,
+        api_key=api_key,
+        timeout=timeout,
+        candidates=tuple(candidate),
+        ca_bundle=ca_bundle,
+    )
+    client = OpenAIClient(config.base_url, config.api_key, config.timeout, config.ca_bundle)
 
     try:
         with console.status("Querying models...", spinner="dots"):

@@ -1,0 +1,51 @@
+[project]
+name = "proto-codegen"
+version = "0.1.0"
+description = "Initial scaffolding for proto-codegen"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "OpenAI", email = "support@openai.com"}]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "click>=8.1.7",
+  "httpx>=0.27.0",
+  "rich>=13.7.1",
+]
+
+[project.scripts]
+proto-codegen = "proto_codegen.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10.0",
+  "pytest>=8.2.0",
+  "respx>=0.21.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unreachable = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+show_error_codes = true
+mypy_path = "src"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

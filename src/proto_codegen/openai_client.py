@@ -58,6 +58,10 @@ class OpenAIClient:
             return results
         return None
 
+    def get_model_info(self, model: str) -> dict[str, Any]:
+        response = self._request("GET", f"/v1/models/{model}")
+        return self._parse_json(response, f"/v1/models/{model}")
+
     def probe_chat_completion(self, model: str) -> bool:
         payload = {
             "model": model,

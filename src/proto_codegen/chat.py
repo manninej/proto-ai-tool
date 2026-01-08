@@ -4,6 +4,7 @@ from collections.abc import Callable
 import json
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
@@ -69,9 +70,18 @@ def run_chat_loop(
                     )
                 )
             if show_reasoning and isinstance(reasoning_text, str) and reasoning_text:
-                console.print(Panel(reasoning_text, title="Assistant Reasoning (debug)", style="dim"))
+                console.print(
+                    Panel(
+                        Markdown(reasoning_text),
+                        title="Assistant Reasoning (debug)",
+                        style="dim",
+                    )
+                )
             if assistant_text:
-                panel = Panel(f"Model: {model_id}\n\n{assistant_text}", title="Assistant")
+                panel = Panel(
+                    Markdown(f"**Model:** {model_id}\n\n{assistant_text}"),
+                    title="Assistant",
+                )
                 console.print(panel)
 
         if not no_history:

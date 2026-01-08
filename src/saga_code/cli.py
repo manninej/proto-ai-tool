@@ -250,13 +250,14 @@ def explain_cpp(
     render_warning(warning_console, skipped)
 
     try:
-        response, final_text = _call_explain_model(
-            client=client,
-            model=model_id,
-            messages=messages,
-            max_tokens=max_tokens,
-            json_mode=as_json,
-        )
+        with console.status("Waiting for response...", spinner="dots"):
+            response, final_text = _call_explain_model(
+                client=client,
+                model=model_id,
+                messages=messages,
+                max_tokens=max_tokens,
+                json_mode=as_json,
+            )
     except (ApiError, NetworkError) as exc:
         print_error_panel(str(exc))
         raise SystemExit(1) from exc

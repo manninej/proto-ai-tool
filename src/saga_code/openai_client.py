@@ -82,12 +82,14 @@ class OpenAIClient:
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int,
+        top_p: float = 1.0,
     ) -> dict[str, Any]:
         payload = {
             "model": model,
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
+            "top_p": top_p,
         }
         response = self._request("POST", "/v1/chat/completions", json=payload)
         data = self._parse_json(response, "/v1/chat/completions")

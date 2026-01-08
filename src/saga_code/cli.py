@@ -278,8 +278,21 @@ def _prompt_for_model(client: OpenAIClient, config: Config) -> str:
     print_models_table(results)
     available = [result.model_id for result in results if result.status == "available"]
     choices = available or [result.model_id for result in results]
-    default_choice = choices[0] if choices else "gpt-oss-120b"
-    return Prompt.ask("Select model", choices=choices, default=default_choice)
+    if not choices:
+        return "gpt-oss-120b"
+    console.print("Available models:")
+    for index, model_id in enumerate(choices, start=1):
+        console.print(f"  {index}. {model_id}")
+    default_index = 1
+    max_index = len(choices)
+    selection = ""
+    valid_choices = [str(i) for i in range(1, max_index + 1)]
+    while selection not in valid_choices:
+        selection = Prompt.ask(
+            f"Select model [1-{max_index}]",
+            default=str(default_index),
+        ).strip()
+    return choices[int(selection) - 1]
 
 
 def _build_command_handler(

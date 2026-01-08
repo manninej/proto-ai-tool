@@ -1,4 +1,4 @@
-"""proto-codegen package."""
+"""SAGA Code package."""
 
 __all__ = ["__version__"]
 

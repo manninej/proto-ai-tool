@@ -3,8 +3,8 @@ from __future__ import annotations
 import respx
 from click.testing import CliRunner
 
-from proto_codegen.cli import main
-from proto_codegen.openai_client import ApiError, OpenAIClient
+from saga_code.cli import main
+from saga_code.openai_client import ApiError, OpenAIClient
 
 
 def test_chat_quit_exits(monkeypatch: object) -> None:

@@ -8,7 +8,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
 
-from proto_codegen.openai_client import OpenAIClient
+from saga_code.openai_client import OpenAIClient
 
 
 def run_chat_loop(

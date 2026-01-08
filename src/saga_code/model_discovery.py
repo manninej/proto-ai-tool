@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Literal
 
-from proto_codegen.openai_client import ApiError, NetworkError, OpenAIClient
+from saga_code.openai_client import ApiError, NetworkError, OpenAIClient
 
 PreferEndpoint = Literal["models", "probe", "auto"]
 

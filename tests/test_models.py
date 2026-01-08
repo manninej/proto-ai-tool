@@ -6,9 +6,9 @@ import respx
 from click.testing import CliRunner
 import httpx
 
-from proto_codegen.cli import main
-from proto_codegen.model_discovery import discover_models
-from proto_codegen.openai_client import OpenAIClient
+from saga_code.cli import main
+from saga_code.model_discovery import discover_models
+from saga_code.openai_client import OpenAIClient
 
 
 def test_list_models_success() -> None:

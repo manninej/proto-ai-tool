@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from proto_codegen.model_discovery import ModelResult
+from saga_code.model_discovery import ModelResult
 
 console = Console()
 

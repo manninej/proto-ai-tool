@@ -87,13 +87,18 @@ class OpenAIClient:
         }
         response = self._request("POST", "/v1/chat/completions", json=payload)
         data = self._parse_json(response, "/v1/chat/completions")
-        assistant_text = self._extract_assistant_text(data, response, "/v1/chat/completions")
-        reasoning_text = self._extract_reasoning_text(data)
+        content, reasoning_content = self._extract_chat_outputs(data)
+        if not content and not reasoning_content:
+            raise ApiError(
+                status_code=response.status_code,
+                message="Model returned no usable output",
+                endpoint="/v1/chat/completions",
+            )
         return {
-            "assistant_text": assistant_text,
             "model": data.get("model") if isinstance(data.get("model"), str) else model,
-            "reasoning_text": reasoning_text,
-            "data": data,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "raw": data,
         }
 
     def _request(self, method: str, endpoint: str, json: dict[str, Any] | None = None) -> httpx.Response:
@@ -140,44 +145,18 @@ class OpenAIClient:
         delay = INITIAL_BACKOFF * (BACKOFF_FACTOR ** (attempt - 1))
         time.sleep(delay)
 
-    def _extract_assistant_text(self, data: dict[str, Any], response: httpx.Response, endpoint: str) -> str:
-        choices = data.get("choices")
-        message = None
-        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
-            candidate = choices[0].get("message")
-            if isinstance(candidate, dict):
-                message = candidate
-
-        content = message.get("content") if isinstance(message, dict) else None
-        if isinstance(content, str) and content.strip():
-            return content
-
-        reasoning = message.get("reasoning_content") if isinstance(message, dict) else None
-        if isinstance(reasoning, str) and reasoning.strip() and "FINAL:" in reasoning:
-            return reasoning
-
-        top_level_keys = list(data.keys()) if isinstance(data, dict) else []
-        message_keys = list(message.keys()) if isinstance(message, dict) else []
-        raise ApiError(
-            status_code=response.status_code,
-            message=(
-                "No final assistant content produced. "
-                f"keys={top_level_keys} message_keys={message_keys}"
-            ),
-            endpoint=endpoint,
-        )
-
-    def _extract_reasoning_text(self, data: dict[str, Any]) -> str | None:
+    def _extract_chat_outputs(self, data: dict[str, Any]) -> tuple[str, str]:
         choices = data.get("choices")
         if not (isinstance(choices, list) and choices and isinstance(choices[0], dict)):
-            return None
+            return "", ""
         message = choices[0].get("message")
         if not isinstance(message, dict):
-            return None
+            return "", ""
+        content = message.get("content")
         reasoning = message.get("reasoning_content")
-        if isinstance(reasoning, str) and reasoning.strip():
-            return reasoning
-        return None
+        content_text = content.strip() if isinstance(content, str) else ""
+        reasoning_text = reasoning.strip() if isinstance(reasoning, str) else ""
+        return content_text, reasoning_text
 
     def _emit_debug(self, response: httpx.Response, data: Any) -> None:
         sink = self.debug_sink or print

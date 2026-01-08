@@ -120,6 +120,7 @@ def models(
 @click.option("--no-history", is_flag=True, help="Disable conversation history.")
 @click.option("--json", "as_json", is_flag=True, help="Print raw JSON responses.")
 @click.option("--show-reasoning/--no-show-reasoning", default=False, show_default=True)
+@click.option("--raw-response", is_flag=True, help="Print raw response JSON instead of formatted output.")
 def chat(
     base_url: str | None,
     api_key: str | None,
@@ -133,6 +134,7 @@ def chat(
     no_history: bool,
     as_json: bool,
     show_reasoning: bool,
+    raw_response: bool,
 ) -> None:
     """Start an interactive chat session."""
     config = load_config(base_url=base_url, api_key=api_key, timeout=timeout, ca_bundle=ca_bundle)
@@ -158,6 +160,7 @@ def chat(
             no_history=no_history,
             json_output=as_json,
             show_reasoning=show_reasoning,
+            raw_response=raw_response,
         )
     except KeyboardInterrupt:
         console.print("Exiting chat.")

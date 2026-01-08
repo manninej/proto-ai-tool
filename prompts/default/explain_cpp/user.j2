@@ -1,0 +1,32 @@
+{% if json_mode %}
+ANALYSIS ONLY. Do not generate code or propose changes.
+Provide a structured explanation of the provided C++ files.
+Reply with FINAL: followed immediately by a JSON object matching this exact shape:
+{
+  "overview": string,
+  "components": [
+    { "name": string, "responsibility": string }
+  ],
+  "data_flow": string,
+  "assumptions": [string],
+  "risks": [string],
+  "open_questions": [string]
+}
+
+Files:
+{{ files_block }}
+{% else %}
+ANALYSIS ONLY. Do not generate code or propose changes.
+Provide a structured explanation of the provided C++ files in Markdown only.
+Use the following headings exactly, in this order:
+## Overview
+## Key Components
+## Data Flow
+## Assumptions
+## Risks / Pitfalls
+## Open Questions
+Under each heading, include concise paragraphs or bullet lists as appropriate.
+
+Files:
+{{ files_block }}
+{% endif %}

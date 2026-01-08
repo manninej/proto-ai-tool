@@ -13,12 +13,6 @@ from rich.panel import Panel
 
 CPP_EXTENSIONS = {".cpp", ".cc", ".cxx", ".c", ".hpp", ".hh", ".hxx", ".h"}
 
-SYSTEM_PROMPT = """You are a senior C++ engineer performing static analysis.
-Do not generate code.
-Do not suggest changes unless explicitly asked.
-Base conclusions strictly on the provided files only.
-If something is unclear, say so explicitly."""
-
 SECTION_TITLES = {
     "overview": "Overview",
     "components": "Key Components",
@@ -40,6 +34,10 @@ class FileBlob:
 class SkipInfo:
     path: str
     reason: str
+
+
+def build_files_block(files: list[FileBlob]) -> str:
+    return "\n\n".join(_format_file_block(blob) for blob in files)
 
 
 def collect_source_files(paths: list[str], exts: set[str], max_files: int) -> list[Path]:
@@ -88,48 +86,6 @@ def read_files_with_budget(files: list[Path], max_bytes: int) -> tuple[list[File
         blobs.append(FileBlob(path=_relpath(path, cwd), content=content, byte_size=content_bytes))
         total_bytes += content_bytes
     return blobs, skipped
-
-
-def build_system_prompt(system_override: str) -> str:
-    if system_override.strip():
-        return f"{SYSTEM_PROMPT}\n\n{system_override.strip()}"
-    return SYSTEM_PROMPT
-
-
-def build_user_prompt(files: list[FileBlob], json_mode: bool) -> str:
-    files_block = "\n\n".join(_format_file_block(blob) for blob in files)
-    if json_mode:
-        return (
-            "ANALYSIS ONLY. Do not generate code or propose changes.\n"
-            "Provide a structured explanation of the provided C++ files.\n"
-            "Reply with FINAL: followed immediately by a JSON object matching this exact shape:\n"
-            "{\n"
-            "  \"overview\": string,\n"
-            "  \"components\": [\n"
-            "    { \"name\": string, \"responsibility\": string }\n"
-            "  ],\n"
-            "  \"data_flow\": string,\n"
-            "  \"assumptions\": [string],\n"
-            "  \"risks\": [string],\n"
-            "  \"open_questions\": [string]\n"
-            "}\n\n"
-            "Files:\n"
-            f"{files_block}"
-        )
-    return (
-        "ANALYSIS ONLY. Do not generate code or propose changes.\n"
-        "Provide a structured explanation of the provided C++ files in Markdown only.\n"
-        "Use the following headings exactly, in this order:\n"
-        "## Overview\n"
-        "## Key Components\n"
-        "## Data Flow\n"
-        "## Assumptions\n"
-        "## Risks / Pitfalls\n"
-        "## Open Questions\n"
-        "Under each heading, include concise paragraphs or bullet lists as appropriate.\n\n"
-        "Files:\n"
-        f"{files_block}"
-    )
 
 
 def parse_sections(text: str) -> dict[str, str]:

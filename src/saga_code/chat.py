@@ -36,8 +36,7 @@ def run_chat_loop(
     command_handler: Callable[[str], CommandResult] | None = None,
 ) -> None:
     history: list[dict[str, str]] = []
-    system_message = _build_system_prompt(system_prompt)
-    history.append({"role": "system", "content": system_message})
+    history.append({"role": "system", "content": system_prompt})
 
     def _prompt() -> str:
         if input_provider is not None:
@@ -61,7 +60,7 @@ def run_chat_loop(
                 if result.max_tokens is not None:
                     max_tokens = result.max_tokens
                 if result.reset_history:
-                    history = [{"role": "system", "content": system_message}]
+                    history = [{"role": "system", "content": system_prompt}]
                 continue
 
         if no_history:
@@ -107,14 +106,7 @@ def run_chat_loop(
                 )
                 console.print(panel)
 
-        if not no_history:
-            history.append({"role": "user", "content": user_input})
-            assistant_value = response.get("content") or response.get("reasoning_content", "")
-            history.append({"role": "assistant", "content": assistant_value})
-
-
-def _build_system_prompt(system_prompt: str) -> str:
-    suffix = "Always produce a final answer in addition to any internal reasoning."
-    if system_prompt.strip():
-        return f"{system_prompt.strip()}\n{suffix}"
-    return suffix
+    if not no_history:
+        history.append({"role": "user", "content": user_input})
+        assistant_value = response.get("content") or response.get("reasoning_content", "")
+        history.append({"role": "assistant", "content": assistant_value})

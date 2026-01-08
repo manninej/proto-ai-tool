@@ -22,6 +22,7 @@ from saga_code.explain_cpp import (
     parse_sections,
     read_files_with_budget,
     render_explanation,
+    render_json_explanation,
     render_warning,
 )
 from saga_code.model_discovery import ModelResult, discover_models
@@ -240,7 +241,7 @@ def explain_cpp(
         raise SystemExit(1)
 
     system_message = build_system_prompt(system_prompt)
-    user_message = build_user_prompt(file_blobs, as_json)
+    user_message = build_user_prompt(file_blobs, True)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message},
@@ -256,7 +257,7 @@ def explain_cpp(
                 model=model_id,
                 messages=messages,
                 max_tokens=max_tokens,
-                json_mode=as_json,
+                json_mode=True,
             )
     except (ApiError, NetworkError) as exc:
         print_error_panel(str(exc))
@@ -275,12 +276,16 @@ def explain_cpp(
     if show_reasoning and not as_json and isinstance(reasoning_text, str) and reasoning_text:
         console.print(Panel(Markdown(reasoning_text), title="Assistant Reasoning (debug)", style="dim"))
 
+    payload = parse_json_response(final_text)
     if as_json:
-        payload = parse_json_response(final_text)
         if payload is None:
             print_error_panel("Failed to parse JSON response after retry.")
             raise SystemExit(1)
         print_json(payload)
+        return
+
+    if payload is not None:
+        render_json_explanation(console, payload)
         return
 
     sections = parse_sections(final_text)

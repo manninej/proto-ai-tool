@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.console import Console
 
 
 CPP_EXTENSIONS = {".cpp", ".cc", ".cxx", ".c", ".hpp", ".hh", ".hxx", ".h"}
@@ -165,6 +165,28 @@ def render_explanation(console: Console, sections: dict[str, str]) -> None:
         console.print(panel)
 
 
+def render_json_explanation(console: Console, payload: dict[str, object]) -> None:
+    overview = payload.get("overview", "")
+    data_flow = payload.get("data_flow", "")
+    components = payload.get("components", [])
+    assumptions = payload.get("assumptions", [])
+    risks = payload.get("risks", [])
+    open_questions = payload.get("open_questions", [])
+
+    panels = {
+        "overview": overview,
+        "components": _format_components(components),
+        "data_flow": data_flow,
+        "assumptions": _format_list(assumptions),
+        "risks": _format_list(risks),
+        "open_questions": _format_list(open_questions),
+    }
+
+    for key, title in SECTION_TITLES.items():
+        panel = Panel(Markdown(panels.get(key, "Not provided.")), title=title)
+        console.print(panel)
+
+
 def render_warning(console: Console, skipped: list[SkipInfo]) -> None:
     if not skipped:
         return
@@ -194,6 +216,31 @@ def _strip_final_prefix(text: str) -> str:
 
 def _relpath(path: Path, cwd: Path) -> str:
     return os.path.relpath(path, cwd)
+
+
+def _format_components(components: object) -> str:
+    if not isinstance(components, list) or not components:
+        return "Not provided."
+    lines: list[str] = []
+    for item in components:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name", "")
+        responsibility = item.get("responsibility", "")
+        if name and responsibility:
+            lines.append(f"- **{name}**: {responsibility}")
+        elif name:
+            lines.append(f"- **{name}**")
+        elif responsibility:
+            lines.append(f"- {responsibility}")
+    return "\n".join(lines) if lines else "Not provided."
+
+
+def _format_list(items: object) -> str:
+    if not isinstance(items, list) or not items:
+        return "Not provided."
+    lines = [f"- {item}" for item in items if isinstance(item, str) and item.strip()]
+    return "\n".join(lines) if lines else "Not provided."
 
 
 def _validate_json_shape(payload: object) -> bool:

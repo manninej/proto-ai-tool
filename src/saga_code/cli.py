@@ -4,12 +4,15 @@ from __future__ import annotations
 import json
 from typing import Callable, Iterable
 import os
+from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Prompt
+
+from jinja2 import Environment
 
 from saga_code import __version__
 
@@ -24,13 +27,10 @@ from saga_code.config import (
     load_persistent_config,
     save_persistent_config,
 )
-from saga_code.chat import run_chat_loop
-from saga_code.config import Config, load_config
 from saga_code.explain_cpp import (
     CPP_EXTENSIONS,
     SkipInfo,
-    build_system_prompt,
-    build_user_prompt,
+    build_files_block,
     collect_source_files,
     discover_source_files,
     parse_json_response,
@@ -43,9 +43,18 @@ from saga_code.explain_cpp import (
 )
 from saga_code.model_discovery import ModelResult, discover_models
 from saga_code.openai_client import ApiError, NetworkError, OpenAIClient
+from saga_code.prompting import PromptError, PromptManager
 from saga_code.render import print_error_panel, print_json, print_models_table
 
 console = Console()
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _prompt_manager() -> PromptManager:
+    return PromptManager(_repo_root())
 
 
 @click.group()
@@ -135,6 +144,117 @@ def models(
     print_models_table(results)
 
 
+@main.command("prompts")
+@click.argument("stack", required=False)
+@click.option("--json", "as_json", is_flag=True, help="Output machine-readable JSON.")
+@click.option("--show-resolved", "show_resolved", help="Show composed template for BUNDLE/ROLE.")
+@click.option("--render", "render_bundle", help="Render BUNDLE/ROLE with merged variables.")
+@click.option("--validate", "validate_stack", is_flag=True, help="Validate the active prompt stack.")
+def prompts(
+    stack: str | None,
+    as_json: bool,
+    show_resolved: str | None,
+    render_bundle: str | None,
+    validate_stack: bool,
+) -> None:
+    """List or configure prompt layers."""
+    prompt_manager = _prompt_manager()
+    if stack and (show_resolved or render_bundle or validate_stack):
+        print_error_panel("Cannot combine stack updates with --show-resolved, --render, or --validate.")
+        raise SystemExit(1)
+
+    if stack:
+        stack_list = _parse_stack_arg(stack)
+        try:
+            prompt_manager.write_active_stack(stack_list)
+        except PromptError as exc:
+            print_error_panel(str(exc))
+            raise SystemExit(1) from exc
+        console.print(f"Active prompt stack set to: {','.join(stack_list)}")
+        return
+
+    if validate_stack:
+        try:
+            _validate_prompt_stack(prompt_manager)
+        except PromptError as exc:
+            print_error_panel(str(exc))
+            raise SystemExit(1) from exc
+        console.print("Prompt stack validation passed.")
+        return
+
+    if show_resolved:
+        bundle, role = _parse_bundle_role(show_resolved)
+        try:
+            stack_list = prompt_manager.read_active_stack()
+            template_text, sources = prompt_manager.compose_text(stack_list, bundle, role)
+        except PromptError as exc:
+            print_error_panel(str(exc))
+            raise SystemExit(1) from exc
+        console.print("Resolved prompt stack:")
+        console.print(f"  Stack: {', '.join(sources.stack)}")
+        console.print(f"  Body: {sources.body_path}")
+        if sources.prepend_paths:
+            console.print("  Prepends:")
+            for path in sources.prepend_paths:
+                console.print(f"    - {path}")
+        if sources.append_paths:
+            console.print("  Appends:")
+            for path in sources.append_paths:
+                console.print(f"    - {path}")
+        console.print("\nComposed template:\n")
+        console.print(template_text)
+        return
+
+    if render_bundle:
+        bundle, role = _parse_bundle_role(render_bundle)
+        try:
+            stack_list = prompt_manager.read_active_stack()
+            rendered = prompt_manager.render(stack_list, bundle, role)
+        except PromptError as exc:
+            print_error_panel(str(exc))
+            raise SystemExit(1) from exc
+        console.print(rendered)
+        return
+
+    try:
+        layers = prompt_manager.list_layers()
+        active_path = _repo_root() / "prompts" / "active_stack.txt"
+        if active_path.exists():
+            active_stack = prompt_manager.read_active_stack()
+            active_label = "Active stack"
+        else:
+            active_stack = prompt_manager.read_active_stack()
+            active_label = "Recommended stack"
+        bundles = prompt_manager.list_bundles(layers)
+    except PromptError as exc:
+        print_error_panel(str(exc))
+        raise SystemExit(1) from exc
+
+    if as_json:
+        payload = {
+            "layers": layers,
+            "stack": active_stack,
+            "stack_label": active_label,
+            "bundles": bundles,
+        }
+        print_json(payload)
+        return
+
+    console.print("Available prompt layers:")
+    if layers:
+        for layer in layers:
+            console.print(f"  - {layer}")
+    else:
+        console.print("  (none)")
+    console.print(f"{active_label}: {', '.join(active_stack)}")
+    if bundles:
+        console.print("Discovered prompt bundles:")
+        for bundle in bundles:
+            console.print(f"  - {bundle}")
+    else:
+        console.print("No prompt bundles found.")
+
+
 @main.command()
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
@@ -183,12 +303,25 @@ def chat(
     model_id = model_override or config.default_model or _resolve_default_model(client, config)
 
     resolved_max_tokens = max_tokens or _resolve_max_tokens(client, model_id)
+    prompt_manager = _prompt_manager()
+    try:
+        stack = prompt_manager.read_active_stack()
+        runtime_prepend = f"{system_prompt.strip()}\n" if system_prompt.strip() else None
+        system_message = prompt_manager.render_with_prepend(
+            stack,
+            bundle="chat",
+            role="system",
+            runtime_prepend=runtime_prepend,
+        )
+    except PromptError as exc:
+        print_error_panel(str(exc))
+        raise SystemExit(1) from exc
     try:
         run_chat_loop(
             client=client,
             console=console,
             model=model_id,
-            system_prompt=system_prompt,
+            system_prompt=system_message,
             temperature=temperature,
             max_tokens=resolved_max_tokens,
             no_history=no_history,
@@ -265,8 +398,26 @@ def explain_cpp(
         print_error_panel("No files remaining after applying limits.")
         raise SystemExit(1)
 
-    system_message = build_system_prompt(system_prompt)
-    user_message = build_user_prompt(file_blobs, as_json)
+    prompt_manager = _prompt_manager()
+    try:
+        stack = prompt_manager.read_active_stack()
+        runtime_prepend = f"\n\n{system_prompt.strip()}" if system_prompt.strip() else None
+        system_message = prompt_manager.render_with_prepend(
+            stack,
+            bundle="explain_cpp",
+            role="system",
+            runtime_prepend=runtime_prepend,
+        )
+        files_block = build_files_block(file_blobs)
+        user_message = prompt_manager.render(
+            stack,
+            bundle="explain_cpp",
+            role="user",
+            extra_vars={"files_block": files_block, "json_mode": as_json},
+        )
+    except PromptError as exc:
+        print_error_panel(str(exc))
+        raise SystemExit(1) from exc
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message},
@@ -444,6 +595,45 @@ def _results_to_json(results: Iterable[ModelResult]) -> list[dict[str, str]]:
         }
         for result in results
     ]
+
+
+def _parse_stack_arg(raw_stack: str) -> list[str]:
+    parts = [part.strip() for part in raw_stack.split(",")]
+    if not parts or any(not part for part in parts):
+        raise PromptError("Prompt stack must be a comma-separated list of layer names.")
+    for part in parts:
+        if any(ch.isspace() for ch in part):
+            raise PromptError("Prompt layer names must not contain whitespace.")
+    return parts
+
+
+def _parse_bundle_role(raw: str) -> tuple[str, str]:
+    if "/" not in raw:
+        raise PromptError("Expected bundle/role format.")
+    bundle, role = raw.split("/", 1)
+    if not bundle or not role:
+        raise PromptError("Expected bundle/role format.")
+    if role not in {"system", "user"}:
+        raise PromptError("Role must be 'system' or 'user'.")
+    return bundle, role
+
+
+def _validate_prompt_stack(prompt_manager: PromptManager) -> None:
+    stack = prompt_manager.read_active_stack()
+    bundles = prompt_manager.list_bundles(stack)
+    if not bundles:
+        raise PromptError("No prompt bundles found in the active stack.")
+    for bundle in bundles:
+        for role in ("system", "user"):
+            prompt_manager.resolve_sources(stack, bundle, role)
+    prompt_manager.load_variables(stack)
+    env = Environment(autoescape=False)
+    prompts_root = _repo_root() / "prompts"
+    for layer in stack:
+        layer_root = prompts_root / layer
+        for path in sorted(layer_root.rglob("*.j2")):
+            source = path.read_text(encoding="utf-8")
+            env.parse(source)
 
 
 def _ensure_persistent_config() -> PersistentConfig:

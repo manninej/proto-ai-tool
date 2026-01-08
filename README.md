@@ -1,6 +1,6 @@
-# proto-codegen
+# SAGA Code
 
-Initial scaffolding for a future codegen/analysis tool. This package currently supports discovering available models from an OpenAI-compatible API.
+Initial scaffolding for SAGA Code. This package currently supports discovering available models from an OpenAI-compatible API.
 
 ## Installation
 
@@ -17,21 +17,21 @@ Set environment variables as needed:
 ```bash
 export OPENAI_API_KEY="your-key"
 export OPENAI_BASE_URL="https://api.openai.com"  # default
-export PROTO_CODEGEN_CANDIDATE_MODELS="gpt-oss-120b,another-model"
+export SAGA_CODE_CANDIDATE_MODELS="gpt-oss-120b,another-model"
 ```
 
 ## CLI usage
 
 ```bash
-proto-codegen version
-proto-codegen models
-proto-codegen chat --model gpt-oss-120b
+saga version
+saga models
+saga chat --model gpt-oss-120b
 ```
 
 ### Options
 
 ```bash
-proto-codegen models \
+saga models \
   --base-url https://api.openai.com \
   --api-key $OPENAI_API_KEY \
   --timeout 30 \
@@ -43,7 +43,7 @@ proto-codegen models \
 ### Chat usage
 
 ```bash
-proto-codegen chat --model gpt-oss-120b
+saga chat --model gpt-oss-120b
 ```
 
 Use `/quit` or `/exit` to leave the chat session.

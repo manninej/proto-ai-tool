@@ -7,28 +7,28 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
-from proto_codegen import __version__
-from proto_codegen.chat import run_chat_loop
-from proto_codegen.config import Config, load_config
-from proto_codegen.model_discovery import ModelResult, discover_models
-from proto_codegen.openai_client import ApiError, NetworkError, OpenAIClient
-from proto_codegen.render import print_error_panel, print_json, print_models_table
+from saga_code import __version__
+from saga_code.chat import run_chat_loop
+from saga_code.config import Config, load_config
+from saga_code.model_discovery import ModelResult, discover_models
+from saga_code.openai_client import ApiError, NetworkError, OpenAIClient
+from saga_code.render import print_error_panel, print_json, print_models_table
 
 console = Console()
 
 
 @click.group()
 def main() -> None:
-    """proto-codegen CLI."""
+    """SAGA Code CLI."""
 
 
 @main.command()
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
-@click.option("--timeout", envvar="PROTO_CODEGEN_TIMEOUT", type=int, help="Request timeout in seconds.")
+@click.option("--timeout", envvar="SAGA_CODE_TIMEOUT", type=int, help="Request timeout in seconds.")
 @click.option(
     "--ca-bundle",
-    envvar="PROTO_CODEGEN_CA_BUNDLE",
+    envvar="SAGA_CODE_CA_BUNDLE",
     help="Path to a PEM-encoded CA bundle for TLS verification.",
 )
 def version(base_url: str | None, api_key: str | None, timeout: int | None, ca_bundle: str | None) -> None:
@@ -39,7 +39,7 @@ def version(base_url: str | None, api_key: str | None, timeout: int | None, ca_b
         f"Base URL: {config.base_url}\n"
         f"API key present: {'yes' if config.has_api_key else 'no'}\n"
         f"CA bundle: {config.ca_bundle or 'default'}",
-        title="proto-codegen",
+        title="SAGA Code",
     )
     console.print(panel)
 
@@ -47,10 +47,10 @@ def version(base_url: str | None, api_key: str | None, timeout: int | None, ca_b
 @main.command()
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
-@click.option("--timeout", envvar="PROTO_CODEGEN_TIMEOUT", type=int, help="Request timeout in seconds.")
+@click.option("--timeout", envvar="SAGA_CODE_TIMEOUT", type=int, help="Request timeout in seconds.")
 @click.option(
     "--ca-bundle",
-    envvar="PROTO_CODEGEN_CA_BUNDLE",
+    envvar="SAGA_CODE_CA_BUNDLE",
     help="Path to a PEM-encoded CA bundle for TLS verification.",
 )
 @click.option("--debug-http", is_flag=True, help="Print HTTP debug information.")
@@ -106,10 +106,10 @@ def models(
 @main.command()
 @click.option("--base-url", envvar="OPENAI_BASE_URL", help="Override the API base URL.")
 @click.option("--api-key", envvar="OPENAI_API_KEY", help="Override the API key.")
-@click.option("--timeout", envvar="PROTO_CODEGEN_TIMEOUT", type=int, help="Request timeout in seconds.")
+@click.option("--timeout", envvar="SAGA_CODE_TIMEOUT", type=int, help="Request timeout in seconds.")
 @click.option(
     "--ca-bundle",
-    envvar="PROTO_CODEGEN_CA_BUNDLE",
+    envvar="SAGA_CODE_CA_BUNDLE",
     help="Path to a PEM-encoded CA bundle for TLS verification.",
 )
 @click.option("--debug-http", is_flag=True, help="Print HTTP debug information.")

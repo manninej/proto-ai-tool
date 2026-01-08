@@ -1,7 +1,7 @@
 [project]
-name = "proto-codegen"
+name = "saga-code"
 version = "0.1.0"
-description = "Initial scaffolding for proto-codegen"
+description = "Initial scaffolding for SAGA Code"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-proto-codegen = "proto_codegen.cli:main"
+saga = "saga_code.cli:main"
 
 [project.optional-dependencies]
 dev = [

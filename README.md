@@ -26,6 +26,8 @@ export SAGA_CODE_CANDIDATE_MODELS="gpt-oss-120b,another-model"
 saga version
 saga models
 saga chat --model gpt-oss-120b
+saga explain-cpp src/
+saga explain-cpp --json src/foo.cpp
 ```
 
 ### Options
@@ -47,6 +49,15 @@ saga chat --model gpt-oss-120b
 ```
 
 Use `/quit` or `/exit` to leave the chat session.
+
+### C++ explain usage
+
+```bash
+saga explain-cpp src/
+saga explain-cpp --json src/foo.cpp
+```
+
+The explain command reads up to 20 files (default) and 200000 bytes total by default. Use `--show-reasoning` to emit the model reasoning panel for debugging.
 
 ## Notes
 

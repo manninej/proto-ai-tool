@@ -40,6 +40,7 @@ def test_chat_completion_payload_shape() -> None:
         "messages": [{"role": "user", "content": "hello"}],
         "temperature": 0.5,
         "max_tokens": 10,
+        "top_p": 1.0,
     }
 
 

@@ -53,6 +53,7 @@ def version(base_url: str | None, api_key: str | None, timeout: int | None, ca_b
     envvar="PROTO_CODEGEN_CA_BUNDLE",
     help="Path to a PEM-encoded CA bundle for TLS verification.",
 )
+@click.option("--debug-http", is_flag=True, help="Print HTTP debug information.")
 @click.option(
     "--prefer-endpoint",
     type=click.Choice(["models", "probe", "auto"], case_sensitive=False),
@@ -66,6 +67,7 @@ def models(
     api_key: str | None,
     timeout: int | None,
     ca_bundle: str | None,
+    debug_http: bool,
     prefer_endpoint: str,
     candidate: Iterable[str],
     as_json: bool,
@@ -78,7 +80,14 @@ def models(
         candidates=tuple(candidate),
         ca_bundle=ca_bundle,
     )
-    client = OpenAIClient(config.base_url, config.api_key, config.timeout, config.ca_bundle)
+    client = OpenAIClient(
+        config.base_url,
+        config.api_key,
+        config.timeout,
+        config.ca_bundle,
+        debug_http=debug_http,
+        debug_sink=console.print,
+    )
 
     try:
         with console.status("Querying models...", spinner="dots"):
@@ -103,27 +112,38 @@ def models(
     envvar="PROTO_CODEGEN_CA_BUNDLE",
     help="Path to a PEM-encoded CA bundle for TLS verification.",
 )
+@click.option("--debug-http", is_flag=True, help="Print HTTP debug information.")
 @click.option("--model", "model_override", help="Model ID to use for chat.")
 @click.option("--system", "system_prompt", default="", help="Optional system prompt.")
 @click.option("--temperature", type=float, default=0.0, show_default=True)
 @click.option("--max-tokens", type=int, default=1024, show_default=True)
 @click.option("--no-history", is_flag=True, help="Disable conversation history.")
 @click.option("--json", "as_json", is_flag=True, help="Print raw JSON responses.")
+@click.option("--show-reasoning/--no-show-reasoning", default=False, show_default=True)
 def chat(
     base_url: str | None,
     api_key: str | None,
     timeout: int | None,
     ca_bundle: str | None,
+    debug_http: bool,
     model_override: str | None,
     system_prompt: str,
     temperature: float,
     max_tokens: int,
     no_history: bool,
     as_json: bool,
+    show_reasoning: bool,
 ) -> None:
     """Start an interactive chat session."""
     config = load_config(base_url=base_url, api_key=api_key, timeout=timeout, ca_bundle=ca_bundle)
-    client = OpenAIClient(config.base_url, config.api_key, config.timeout, config.ca_bundle)
+    client = OpenAIClient(
+        config.base_url,
+        config.api_key,
+        config.timeout,
+        config.ca_bundle,
+        debug_http=debug_http,
+        debug_sink=console.print,
+    )
 
     model_id = model_override or _resolve_default_model(client, config)
 
@@ -137,6 +157,7 @@ def chat(
             max_tokens=max_tokens,
             no_history=no_history,
             json_output=as_json,
+            show_reasoning=show_reasoning,
         )
     except KeyboardInterrupt:
         console.print("Exiting chat.")

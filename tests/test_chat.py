@@ -4,7 +4,7 @@ import respx
 from click.testing import CliRunner
 
 from proto_codegen.cli import main
-from proto_codegen.openai_client import OpenAIClient
+from proto_codegen.openai_client import ApiError, OpenAIClient
 
 
 def test_chat_quit_exits(monkeypatch: object) -> None:
@@ -55,7 +55,7 @@ def test_chat_history_on(monkeypatch: object) -> None:
     ) -> dict[str, object]:
         calls.append(messages)
         return {
-            "assistant_text": "ok",
+            "assistant_text": "FINAL: ok",
             "model": model,
             "data": {"choices": [{"message": {"content": "ok"}}], "model": model},
         }
@@ -74,7 +74,7 @@ def test_chat_history_on(monkeypatch: object) -> None:
         [{"role": "user", "content": "hello"}],
         [
             {"role": "user", "content": "hello"},
-            {"role": "assistant", "content": "ok"},
+            {"role": "assistant", "content": "FINAL: ok"},
             {"role": "user", "content": "there"},
         ],
     ]
@@ -92,7 +92,7 @@ def test_chat_history_off(monkeypatch: object) -> None:
     ) -> dict[str, object]:
         calls.append(messages)
         return {
-            "assistant_text": "ok",
+            "assistant_text": "FINAL: ok",
             "model": model,
             "data": {"choices": [{"message": {"content": "ok"}}], "model": model},
         }
@@ -111,3 +111,73 @@ def test_chat_history_off(monkeypatch: object) -> None:
         [{"role": "system", "content": "You are a helper."}, {"role": "user", "content": "hello"}],
         [{"role": "system", "content": "You are a helper."}, {"role": "user", "content": "there"}],
     ]
+
+
+def test_reasoning_content_with_final_is_used() -> None:
+    with respx.mock(base_url="https://api.example.com") as router:
+        router.post("/v1/chat/completions").respond(
+            200,
+            json={
+                "choices": [{"message": {"content": "", "reasoning_content": "FINAL: ok"}}],
+                "model": "model-x",
+            },
+        )
+        client = OpenAIClient("https://api.example.com", api_key="test", timeout=5)
+        response = client.chat_completion(
+            model="model-x",
+            messages=[{"role": "user", "content": "hello"}],
+            temperature=0.0,
+            max_tokens=10,
+        )
+
+    assert response["assistant_text"] == "FINAL: ok"
+
+
+def test_reasoning_content_without_final_errors() -> None:
+    with respx.mock(base_url="https://api.example.com") as router:
+        router.post("/v1/chat/completions").respond(
+            200,
+            json={
+                "choices": [{"message": {"content": "", "reasoning_content": "thinking"}}],
+                "model": "model-x",
+            },
+        )
+        client = OpenAIClient("https://api.example.com", api_key="test", timeout=5)
+        try:
+            client.chat_completion(
+                model="model-x",
+                messages=[{"role": "user", "content": "hello"}],
+                temperature=0.0,
+                max_tokens=10,
+            )
+        except ApiError as exc:
+            assert "No final assistant content produced" in exc.message
+        else:
+            raise AssertionError("Expected ApiError for missing FINAL in reasoning_content")
+
+
+def test_mixed_content_prefers_content() -> None:
+    with respx.mock(base_url="https://api.example.com") as router:
+        router.post("/v1/chat/completions").respond(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": "FINAL: content",
+                            "reasoning_content": "FINAL: reasoning",
+                        }
+                    }
+                ],
+                "model": "model-x",
+            },
+        )
+        client = OpenAIClient("https://api.example.com", api_key="test", timeout=5)
+        response = client.chat_completion(
+            model="model-x",
+            messages=[{"role": "user", "content": "hello"}],
+            temperature=0.0,
+            max_tokens=10,
+        )
+
+    assert response["assistant_text"] == "FINAL: content"

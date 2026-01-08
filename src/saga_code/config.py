@@ -2,13 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 from typing import Iterable, Sequence
+
+import yaml
 
 DEFAULT_BASE_URL = "https://api.openai.com"
 DEFAULT_TIMEOUT = 30
 DEFAULT_CANDIDATES = ["gpt-oss-120b"]
 CANDIDATE_ENV_VAR = "SAGA_CODE_CANDIDATE_MODELS"
 CA_BUNDLE_ENV_VAR = "SAGA_CODE_CA_BUNDLE"
+CONFIG_DIR_NAME = "saga-code"
+CONFIG_FILE_NAME = "config.yaml"
 
 
 @dataclass(frozen=True)
@@ -18,10 +23,19 @@ class Config:
     timeout: int
     candidates: tuple[str, ...]
     ca_bundle: str | None
+    default_model: str | None
 
     @property
     def has_api_key(self) -> bool:
         return bool(self.api_key)
+
+
+@dataclass(frozen=True)
+class PersistentConfig:
+    base_url: str | None = None
+    api_key: str | None = None
+    ca_bundle: str | None = None
+    model: str | None = None
 
 
 def _split_candidates(value: str | None) -> list[str]:
@@ -37,7 +51,8 @@ def load_config(
     candidates: Sequence[str] | None = None,
     ca_bundle: str | None = None,
 ) -> Config:
-    env_base_url = os.getenv("OPENAI_BASE_URL", DEFAULT_BASE_URL)
+    persistent = load_persistent_config()
+    env_base_url = os.getenv("OPENAI_BASE_URL")
     env_api_key = os.getenv("OPENAI_API_KEY")
     env_candidates = _split_candidates(os.getenv(CANDIDATE_ENV_VAR))
     env_ca_bundle = os.getenv(CA_BUNDLE_ENV_VAR)
@@ -49,11 +64,12 @@ def load_config(
         resolved_candidates.extend(candidates)
 
     return Config(
-        base_url=base_url or env_base_url,
-        api_key=api_key or env_api_key,
+        base_url=base_url or env_base_url or (persistent.base_url if persistent else None) or DEFAULT_BASE_URL,
+        api_key=api_key or env_api_key or (persistent.api_key if persistent else None),
         timeout=timeout if timeout is not None else DEFAULT_TIMEOUT,
         candidates=tuple(_dedupe_preserve_order(resolved_candidates)),
-        ca_bundle=ca_bundle or env_ca_bundle,
+        ca_bundle=ca_bundle or env_ca_bundle or (persistent.ca_bundle if persistent else None),
+        default_model=persistent.model if persistent else None,
     )
 
 
@@ -66,3 +82,37 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def config_path() -> Path:
+    base_dir = os.getenv("XDG_CONFIG_HOME")
+    if base_dir:
+        return Path(base_dir) / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+    return Path.home() / ".config" / CONFIG_DIR_NAME / CONFIG_FILE_NAME
+
+
+def load_persistent_config() -> PersistentConfig | None:
+    path = config_path()
+    if not path.exists():
+        return None
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return None
+    return PersistentConfig(
+        base_url=data.get("base_url"),
+        api_key=data.get("api_key"),
+        ca_bundle=data.get("ca_bundle"),
+        model=data.get("model"),
+    )
+
+
+def save_persistent_config(config: PersistentConfig) -> None:
+    path = config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "base_url": config.base_url,
+        "api_key": config.api_key,
+        "ca_bundle": config.ca_bundle,
+        "model": config.model,
+    }
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")

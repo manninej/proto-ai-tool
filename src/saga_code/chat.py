@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 import json
 
 from rich.console import Console
@@ -9,6 +10,15 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from saga_code.openai_client import OpenAIClient
+
+
+@dataclass
+class CommandResult:
+    handled: bool
+    client: OpenAIClient | None = None
+    model: str | None = None
+    max_tokens: int | None = None
+    reset_history: bool = False
 
 
 def run_chat_loop(
@@ -23,6 +33,7 @@ def run_chat_loop(
     show_reasoning: bool,
     raw_response: bool,
     input_provider: Callable[[], str] | None = None,
+    command_handler: Callable[[str], CommandResult] | None = None,
 ) -> None:
     history: list[dict[str, str]] = []
     system_message = _build_system_prompt(system_prompt)
@@ -40,6 +51,18 @@ def run_chat_loop(
             continue
         if stripped in {"/quit", "/exit"}:
             break
+        if stripped.startswith("/") and command_handler is not None:
+            result = command_handler(stripped)
+            if result.handled:
+                if result.client is not None:
+                    client = result.client
+                if result.model is not None:
+                    model = result.model
+                if result.max_tokens is not None:
+                    max_tokens = result.max_tokens
+                if result.reset_history:
+                    history = [{"role": "system", "content": system_message}]
+                continue
 
         if no_history:
             messages = history[:1]

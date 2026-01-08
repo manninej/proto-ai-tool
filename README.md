@@ -32,6 +32,8 @@ values are stored in YAML at:
 saga version
 saga models
 saga chat --model gpt-oss-120b
+saga explain-cpp src/
+saga explain-cpp --json src/foo.cpp
 ```
 
 ### Options
@@ -59,6 +61,15 @@ During chat, you can update configuration with:
 * `/server [url] [pem]` - change server URL and optional PEM bundle path
 * `/token [token]` - change access token
 * `/model [model-id]` - change model (omit the model ID to list and select)
+
+### C++ explain usage
+
+```bash
+saga explain-cpp src/
+saga explain-cpp --json src/foo.cpp
+```
+
+The explain command reads up to 20 files (default) and 200000 bytes total by default. Use `--show-reasoning` to emit the model reasoning panel for debugging.
 
 ## Notes
 

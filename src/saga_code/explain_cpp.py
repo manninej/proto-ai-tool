@@ -118,16 +118,22 @@ def build_user_prompt(files: list[FileBlob], json_mode: bool) -> str:
         )
     return (
         "ANALYSIS ONLY. Do not generate code or propose changes.\n"
-        "Provide a structured explanation of the provided C++ files with these sections:\n"
-        "Overview, Key Components (bulleted list), Data Flow, Assumptions, Risks / Pitfalls, Open Questions.\n"
-        "Use clear section headings exactly as listed.\n\n"
+        "Provide a structured explanation of the provided C++ files in Markdown only.\n"
+        "Use the following headings exactly, in this order:\n"
+        "## Overview\n"
+        "## Key Components\n"
+        "## Data Flow\n"
+        "## Assumptions\n"
+        "## Risks / Pitfalls\n"
+        "## Open Questions\n"
+        "Under each heading, include concise paragraphs or bullet lists as appropriate.\n\n"
         "Files:\n"
         f"{files_block}"
     )
 
 
 def parse_sections(text: str) -> dict[str, str]:
-    normalized = _strip_final_prefix(text).strip()
+    normalized = strip_final_prefix(text).strip()
     sections = {key: "" for key in SECTION_TITLES}
     current_key: str | None = None
     for line in normalized.splitlines():
@@ -149,7 +155,7 @@ def parse_sections(text: str) -> dict[str, str]:
 
 
 def parse_json_response(text: str) -> dict[str, object] | None:
-    normalized = _strip_final_prefix(text).strip()
+    normalized = strip_final_prefix(text).strip()
     try:
         payload = json.loads(normalized)
     except json.JSONDecodeError:
@@ -162,28 +168,6 @@ def parse_json_response(text: str) -> dict[str, object] | None:
 def render_explanation(console: Console, sections: dict[str, str]) -> None:
     for key, title in SECTION_TITLES.items():
         panel = Panel(Markdown(sections.get(key, "")), title=title)
-        console.print(panel)
-
-
-def render_json_explanation(console: Console, payload: dict[str, object]) -> None:
-    overview = payload.get("overview", "")
-    data_flow = payload.get("data_flow", "")
-    components = payload.get("components", [])
-    assumptions = payload.get("assumptions", [])
-    risks = payload.get("risks", [])
-    open_questions = payload.get("open_questions", [])
-
-    panels = {
-        "overview": overview,
-        "components": _format_components(components),
-        "data_flow": data_flow,
-        "assumptions": _format_list(assumptions),
-        "risks": _format_list(risks),
-        "open_questions": _format_list(open_questions),
-    }
-
-    for key, title in SECTION_TITLES.items():
-        panel = Panel(Markdown(panels.get(key, "Not provided.")), title=title)
         console.print(panel)
 
 
@@ -207,7 +191,7 @@ def _match_section_heading(line: str) -> str | None:
     return None
 
 
-def _strip_final_prefix(text: str) -> str:
+def strip_final_prefix(text: str) -> str:
     stripped = text.strip()
     if stripped.startswith("FINAL:"):
         return stripped[len("FINAL:") :].lstrip()
@@ -216,31 +200,6 @@ def _strip_final_prefix(text: str) -> str:
 
 def _relpath(path: Path, cwd: Path) -> str:
     return os.path.relpath(path, cwd)
-
-
-def _format_components(components: object) -> str:
-    if not isinstance(components, list) or not components:
-        return "Not provided."
-    lines: list[str] = []
-    for item in components:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name", "")
-        responsibility = item.get("responsibility", "")
-        if name and responsibility:
-            lines.append(f"- **{name}**: {responsibility}")
-        elif name:
-            lines.append(f"- **{name}**")
-        elif responsibility:
-            lines.append(f"- {responsibility}")
-    return "\n".join(lines) if lines else "Not provided."
-
-
-def _format_list(items: object) -> str:
-    if not isinstance(items, list) or not items:
-        return "Not provided."
-    lines = [f"- {item}" for item in items if isinstance(item, str) and item.strip()]
-    return "\n".join(lines) if lines else "Not provided."
 
 
 def _validate_json_shape(payload: object) -> bool:

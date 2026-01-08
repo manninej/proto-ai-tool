@@ -22,8 +22,8 @@ from saga_code.explain_cpp import (
     parse_sections,
     read_files_with_budget,
     render_explanation,
-    render_json_explanation,
     render_warning,
+    strip_final_prefix,
 )
 from saga_code.model_discovery import ModelResult, discover_models
 from saga_code.openai_client import ApiError, NetworkError, OpenAIClient
@@ -241,7 +241,7 @@ def explain_cpp(
         raise SystemExit(1)
 
     system_message = build_system_prompt(system_prompt)
-    user_message = build_user_prompt(file_blobs, True)
+    user_message = build_user_prompt(file_blobs, as_json)
     messages = [
         {"role": "system", "content": system_message},
         {"role": "user", "content": user_message},
@@ -257,7 +257,7 @@ def explain_cpp(
                 model=model_id,
                 messages=messages,
                 max_tokens=max_tokens,
-                json_mode=True,
+                json_mode=as_json,
             )
     except (ApiError, NetworkError) as exc:
         print_error_panel(str(exc))
@@ -276,16 +276,18 @@ def explain_cpp(
     if show_reasoning and not as_json and isinstance(reasoning_text, str) and reasoning_text:
         console.print(Panel(Markdown(reasoning_text), title="Assistant Reasoning (debug)", style="dim"))
 
-    payload = parse_json_response(final_text)
     if as_json:
+        payload = parse_json_response(final_text)
         if payload is None:
             print_error_panel("Failed to parse JSON response after retry.")
             raise SystemExit(1)
         print_json(payload)
         return
 
-    if payload is not None:
-        render_json_explanation(console, payload)
+    markdown_text = strip_final_prefix(final_text).strip()
+    if markdown_text:
+        panel = Panel(Markdown(markdown_text), title="Explanation")
+        console.print(panel)
         return
 
     sections = parse_sections(final_text)
@@ -340,8 +342,7 @@ def _call_explain_model(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "You did not provide a final answer. "
-                        "Reply again with FINAL: followed by the requested output only.",
+                        "content": _retry_prompt(json_mode),
                     }
                 )
                 continue
@@ -354,8 +355,7 @@ def _call_explain_model(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "You did not provide a final answer. "
-                        "Reply again with FINAL: followed by the requested output only.",
+                        "content": _retry_prompt(json_mode),
                     }
                 )
                 continue
@@ -400,6 +400,12 @@ def _select_final_text(response: dict[str, object]) -> str:
             return "FINAL:" + reasoning.split("FINAL:")[-1].lstrip()
         return ""
     return ""
+
+
+def _retry_prompt(json_mode: bool) -> str:
+    if json_mode:
+        return "You did not provide a final answer. Reply again with FINAL: followed by the requested output only."
+    return "You did not provide a final answer. Reply again with the requested Markdown output only."
 
 
 def _results_to_json(results: Iterable[ModelResult]) -> list[dict[str, str]]:

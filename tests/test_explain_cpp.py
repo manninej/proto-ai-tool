@@ -12,15 +12,6 @@ from saga_code.openai_client import OpenAIClient
 def test_explain_cpp_single_file_prompt_and_output(monkeypatch: object) -> None:
     calls: list[list[dict[str, str]]] = []
 
-    payload = {
-        "overview": "Sample summary",
-        "components": [{"name": "main", "responsibility": "entry"}],
-        "data_flow": "none",
-        "assumptions": ["none"],
-        "risks": ["none"],
-        "open_questions": ["none"],
-    }
-
     def fake_chat_completion(
         self: OpenAIClient,
         model: str,
@@ -35,11 +26,24 @@ def test_explain_cpp_single_file_prompt_and_output(monkeypatch: object) -> None:
         assert top_p == 1.0
         user_prompt = messages[1]["content"]
         assert "ANALYSIS ONLY" in user_prompt
-        assert "FINAL:" in user_prompt
+        assert "## Overview" in user_prompt
         assert "<file path=\"src/foo.cpp\">" in user_prompt
         assert "int main()" in user_prompt
         return {
-            "content": f"FINAL: {json.dumps(payload)}",
+            "content": (
+                "## Overview\n"
+                "Sample summary\n\n"
+                "## Key Components\n"
+                "- main\n\n"
+                "## Data Flow\n"
+                "none\n\n"
+                "## Assumptions\n"
+                "- none\n\n"
+                "## Risks / Pitfalls\n"
+                "- none\n\n"
+                "## Open Questions\n"
+                "- none"
+            ),
             "reasoning_content": "",
             "model": model,
             "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
@@ -66,15 +70,6 @@ def test_explain_cpp_single_file_prompt_and_output(monkeypatch: object) -> None:
 def test_explain_cpp_directory_order(monkeypatch: object) -> None:
     captured: list[str] = []
 
-    payload = {
-        "overview": "ok",
-        "components": [{"name": "main", "responsibility": "entry"}],
-        "data_flow": "ok",
-        "assumptions": ["ok"],
-        "risks": ["ok"],
-        "open_questions": ["ok"],
-    }
-
     def fake_chat_completion(
         self: OpenAIClient,
         model: str,
@@ -85,7 +80,14 @@ def test_explain_cpp_directory_order(monkeypatch: object) -> None:
     ) -> dict[str, object]:
         captured.append(messages[1]["content"])
         return {
-            "content": f"FINAL: {json.dumps(payload)}",
+            "content": (
+                "## Overview\nok\n\n"
+                "## Key Components\n- main\n\n"
+                "## Data Flow\nok\n\n"
+                "## Assumptions\n- ok\n\n"
+                "## Risks / Pitfalls\n- ok\n\n"
+                "## Open Questions\n- ok"
+            ),
             "reasoning_content": "",
             "model": model,
             "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
@@ -131,7 +133,14 @@ def test_explain_cpp_json_output(monkeypatch: object) -> None:
         top_p: float = 1.0,
     ) -> dict[str, object]:
         return {
-            "content": f"FINAL: {json.dumps(payload)}",
+            "content": (
+                "## Overview\nok\n\n"
+                "## Key Components\n- main\n\n"
+                "## Data Flow\nok\n\n"
+                "## Assumptions\n- ok\n\n"
+                "## Risks / Pitfalls\n- ok\n\n"
+                "## Open Questions\n- ok"
+            ),
             "reasoning_content": "",
             "model": model,
             "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
@@ -153,15 +162,6 @@ def test_explain_cpp_json_output(monkeypatch: object) -> None:
 
 
 def test_explain_cpp_limits_warn(monkeypatch: object) -> None:
-    payload = {
-        "overview": "ok",
-        "components": [{"name": "main", "responsibility": "entry"}],
-        "data_flow": "ok",
-        "assumptions": ["ok"],
-        "risks": ["ok"],
-        "open_questions": ["ok"],
-    }
-
     def fake_chat_completion(
         self: OpenAIClient,
         model: str,
@@ -171,7 +171,14 @@ def test_explain_cpp_limits_warn(monkeypatch: object) -> None:
         top_p: float = 1.0,
     ) -> dict[str, object]:
         return {
-            "content": f"FINAL: {json.dumps(payload)}",
+            "content": (
+                "## Overview\nok\n\n"
+                "## Key Components\n- main\n\n"
+                "## Data Flow\nok\n\n"
+                "## Assumptions\n- ok\n\n"
+                "## Risks / Pitfalls\n- ok\n\n"
+                "## Open Questions\n- ok"
+            ),
             "reasoning_content": "",
             "model": model,
             "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
@@ -256,15 +263,6 @@ def test_explain_cpp_json_retry(monkeypatch: object) -> None:
 
 
 def test_explain_cpp_reasoning_with_final(monkeypatch: object) -> None:
-    payload = {
-        "overview": "ok",
-        "components": [{"name": "main", "responsibility": "entry"}],
-        "data_flow": "ok",
-        "assumptions": ["ok"],
-        "risks": ["ok"],
-        "open_questions": ["ok"],
-    }
-
     def fake_chat_completion(
         self: OpenAIClient,
         model: str,
@@ -277,7 +275,18 @@ def test_explain_cpp_reasoning_with_final(monkeypatch: object) -> None:
             "content": "",
             "reasoning_content": (
                 "Some analysis.\n"
-                f"FINAL: {json.dumps(payload)}"
+                "FINAL: ## Overview\n"
+                "ok\n\n"
+                "## Key Components\n"
+                "- main\n\n"
+                "## Data Flow\n"
+                "ok\n\n"
+                "## Assumptions\n"
+                "- ok\n\n"
+                "## Risks / Pitfalls\n"
+                "- ok\n\n"
+                "## Open Questions\n"
+                "- ok"
             ),
             "model": model,
             "raw": {"choices": [{"message": {"content": "", "reasoning_content": "ok"}}], "model": model},
@@ -318,7 +327,20 @@ def test_explain_cpp_reasoning_without_final_retries(monkeypatch: object) -> Non
                 "raw": {"choices": [{"message": {"content": "", "reasoning_content": "ok"}}], "model": model},
             }
         return {
-            "content": f"FINAL: {json.dumps(payload)}",
+            "content": (
+                "## Overview\n"
+                "ok\n\n"
+                "## Key Components\n"
+                "- main\n\n"
+                "## Data Flow\n"
+                "ok\n\n"
+                "## Assumptions\n"
+                "- ok\n\n"
+                "## Risks / Pitfalls\n"
+                "- ok\n\n"
+                "## Open Questions\n"
+                "- ok"
+            ),
             "reasoning_content": "",
             "model": model,
             "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
@@ -337,4 +359,4 @@ def test_explain_cpp_reasoning_without_final_retries(monkeypatch: object) -> Non
 
     assert result.exit_code == 0, result.output
     assert len(calls) == 2
-    assert "final answer" in calls[1][-1]["content"]
+    assert "Markdown output" in calls[1][-1]["content"]

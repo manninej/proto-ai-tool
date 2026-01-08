@@ -272,3 +272,52 @@ def test_explain_cpp_reasoning_with_final(monkeypatch: object) -> None:
 
     assert result.exit_code == 0, result.output
     assert "Overview" in result.output
+
+
+def test_explain_cpp_reasoning_without_final_retries(monkeypatch: object) -> None:
+    calls: list[list[dict[str, str]]] = []
+
+    def fake_chat_completion(
+        self: OpenAIClient,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        top_p: float = 1.0,
+    ) -> dict[str, object]:
+        calls.append(messages)
+        if len(calls) == 1:
+            return {
+                "content": "",
+                "reasoning_content": "Some analysis without final.",
+                "model": model,
+                "raw": {"choices": [{"message": {"content": "", "reasoning_content": "ok"}}], "model": model},
+            }
+        return {
+            "content": (
+                "Overview: ok\n"
+                "Key Components: ok\n"
+                "Data Flow: ok\n"
+                "Assumptions: ok\n"
+                "Risks / Pitfalls: ok\n"
+                "Open Questions: ok"
+            ),
+            "reasoning_content": "",
+            "model": model,
+            "raw": {"choices": [{"message": {"content": "ok"}}], "model": model},
+        }
+
+    monkeypatch.setattr(OpenAIClient, "chat_completion", fake_chat_completion)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        source_path = Path("main.cpp")
+        source_path.write_text("// main", encoding="utf-8")
+        result = runner.invoke(
+            main,
+            ["explain-cpp", str(source_path), "--model", "test-model"],
+            env={"RICH_DISABLE": "1"},
+        )
+
+    assert result.exit_code == 0, result.output
+    assert len(calls) == 2
+    assert "final answer" in calls[1][-1]["content"]

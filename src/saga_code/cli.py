@@ -393,7 +393,7 @@ def _select_final_text(response: dict[str, object]) -> str:
     if isinstance(reasoning, str) and reasoning:
         if "FINAL:" in reasoning:
             return "FINAL:" + reasoning.split("FINAL:")[-1].lstrip()
-        return reasoning
+        return ""
     return ""
 
 

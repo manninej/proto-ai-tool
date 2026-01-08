@@ -25,6 +25,7 @@ export PROTO_CODEGEN_CANDIDATE_MODELS="gpt-oss-120b,another-model"
 ```bash
 proto-codegen version
 proto-codegen models
+proto-codegen chat --model gpt-oss-120b
 ```
 
 ### Options
@@ -38,6 +39,14 @@ proto-codegen models \
   --candidate gpt-oss-120b \
   --json
 ```
+
+### Chat usage
+
+```bash
+proto-codegen chat --model gpt-oss-120b
+```
+
+Use `/quit` or `/exit` to leave the chat session.
 
 ## Notes
 

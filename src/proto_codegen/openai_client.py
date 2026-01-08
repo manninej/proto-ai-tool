@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import time
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -25,16 +25,26 @@ class NetworkError(Exception):
 
 
 class OpenAIClient:
-    def __init__(self, base_url: str, api_key: str | None, timeout: int, ca_bundle: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str | None,
+        timeout: int,
+        ca_bundle: str | None = None,
+        debug_http: bool = False,
+        debug_sink: Callable[[str], None] | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self.ca_bundle = ca_bundle
+        self.debug_http = debug_http
+        self.debug_sink = debug_sink
 
-    def list_models(self) -> list[str]:
+    def list_models(self) -> list[str] | None:
         response = self._request("GET", "/v1/models")
         data = self._parse_json(response, "/v1/models")
-        items = data.get("data", [])
+        items = data.get("data", None)
         if isinstance(items, list):
             return [item["id"] for item in items if isinstance(item, dict) and "id" in item]
         models = data.get("models")
@@ -46,7 +56,11 @@ class OpenAIClient:
                 else:
                     results.append(key)
             return results
-        return []
+        return None
+
+    def get_model_info(self, model: str) -> dict[str, Any]:
+        response = self._request("GET", f"/v1/models/{model}")
+        return self._parse_json(response, f"/v1/models/{model}")
 
     def probe_chat_completion(self, model: str) -> bool:
         payload = {
@@ -61,6 +75,35 @@ class OpenAIClient:
                 return False
             raise
         return response.status_code // 100 == 2
+
+    def chat_completion(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        response = self._request("POST", "/v1/chat/completions", json=payload)
+        data = self._parse_json(response, "/v1/chat/completions")
+        content, reasoning_content = self._extract_chat_outputs(data)
+        if not content and not reasoning_content:
+            raise ApiError(
+                status_code=response.status_code,
+                message="Model returned no usable output",
+                endpoint="/v1/chat/completions",
+            )
+        return {
+            "model": data.get("model") if isinstance(data.get("model"), str) else model,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "raw": data,
+        }
 
     def _request(self, method: str, endpoint: str, json: dict[str, Any] | None = None) -> httpx.Response:
         url = f"{self.base_url}{endpoint}"
@@ -95,10 +138,41 @@ class OpenAIClient:
 
     def _parse_json(self, response: httpx.Response, endpoint: str) -> dict[str, Any]:
         try:
-            return response.json()
+            data = response.json()
         except ValueError as exc:
             raise ApiError(status_code=response.status_code, message="Invalid JSON", endpoint=endpoint) from exc
+        if self.debug_http:
+            self._emit_debug(response, data)
+        return data
 
     def _sleep_backoff(self, attempt: int) -> None:
         delay = INITIAL_BACKOFF * (BACKOFF_FACTOR ** (attempt - 1))
         time.sleep(delay)
+
+    def _extract_chat_outputs(self, data: dict[str, Any]) -> tuple[str, str]:
+        choices = data.get("choices")
+        if not (isinstance(choices, list) and choices and isinstance(choices[0], dict)):
+            return "", ""
+        message = choices[0].get("message")
+        if not isinstance(message, dict):
+            return "", ""
+        content = message.get("content")
+        reasoning = message.get("reasoning_content")
+        content_text = content.strip() if isinstance(content, str) else ""
+        reasoning_text = reasoning.strip() if isinstance(reasoning, str) else ""
+        return content_text, reasoning_text
+
+    def _emit_debug(self, response: httpx.Response, data: Any) -> None:
+        sink = self.debug_sink or print
+        status = response.status_code
+        top_level_keys = list(data.keys()) if isinstance(data, dict) else []
+        message_keys: list[str] = []
+        if isinstance(data, dict):
+            choices = data.get("choices")
+            if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+                message = choices[0].get("message")
+                if isinstance(message, dict):
+                    message_keys = list(message.keys())
+        sink(f"HTTP {status}")
+        sink(f"Response keys: {top_level_keys}")
+        sink(f"choices[0].message keys: {message_keys}")

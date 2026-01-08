@@ -326,9 +326,10 @@ def _call_explain_model(
     messages: list[dict[str, str]],
     max_tokens: int,
     json_mode: bool,
+    max_attempts: int = 3,
 ) -> tuple[dict[str, object], str]:
     last_response: dict[str, object] = {}
-    for attempt in range(2):
+    for attempt in range(max_attempts):
         try:
             response = client.chat_completion(
                 model=model,

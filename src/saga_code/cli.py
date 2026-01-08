@@ -275,7 +275,6 @@ def _prompt_for_model(client: OpenAIClient, config: Config) -> str:
         console.print("No models discovered; falling back to gpt-oss-120b.")
         return "gpt-oss-120b"
 
-    print_models_table(results)
     available = [result.model_id for result in results if result.status == "available"]
     choices = available or [result.model_id for result in results]
     if not choices:
